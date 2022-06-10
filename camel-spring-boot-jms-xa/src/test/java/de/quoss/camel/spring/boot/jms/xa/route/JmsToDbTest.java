@@ -22,9 +22,12 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
 @SpringBootTest
-class JmsOkTest {
+class JmsToDbTest {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(JmsOkTest.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(JmsToDbTest.class);
+
+    // acquire connection factory (but not the auto-wired one from main route (duplicate client-id issue / xa issue)
+    private static final ActiveMQConnectionFactory CF = new ActiveMQConnectionFactory();
 
     @Autowired
     CamelContext ctx;
@@ -35,17 +38,23 @@ class JmsOkTest {
      * @throws Exception in case of unexpected test setup errors.
      */
     @Test
-    void testMain() throws Exception {
+    void testJmsToDbOk() throws Exception {
+        // send message
+        JmsTemplate template = new JmsTemplate(CF);
+        template.setReceiveTimeout(1000L);
+        Destination d = CF.createConnection().createSession().createTopic(JmsToDb.ROUTE_ID);
+        template.convertAndSend(d, "0 test");
         Thread.sleep(5500L);
+        Assertions.assertTrue(true);
     }
 
     /**
-     * Test that message remains in topic queue when error in route occurs.
+     * Test that message resides in DLQ when error in route occurs after retries are exhausted.
      * @throws Exception in case of unexpected test setup errors.
      */
     @Test
-    void testMainError() throws Exception {
-        final String methodName = "testMainError()";
+    void testJmsOkError() throws Exception {
+        final String methodName = "testJmsOkError()";
         LOGGER.trace("{} start", methodName);
         // acquire connection factory (but not the auto-wired one from main route (duplicate client-id issue / xa issue)
         ActiveMQConnectionFactory cf = new ActiveMQConnectionFactory();
@@ -53,16 +62,16 @@ class JmsOkTest {
         Thread.sleep(1000L);
         // stop the main route
         Assertions.assertNotNull(ctx);
-        ctx.getRouteController().stopRoute(JmsOk.ROUTE_ID);
+        ctx.getRouteController().stopRoute(JmsToDb.ROUTE_ID);
         // add error producing processor before log node
-        AdviceWith.adviceWith(ctx, JmsOk.ROUTE_ID, a -> {
-            a.weaveById(JmsOk.ROUTE_ID + ".log").before().process(e -> {
+        AdviceWith.adviceWith(ctx, JmsToDb.ROUTE_ID, a -> {
+            a.weaveById(JmsToDb.ROUTE_ID + ".log").before().process(e -> {
                 throw new RuntimeException("This happens on purpose");
-            }).id(JmsOk.ROUTE_ID + ".process");
+            }).id(JmsToDb.ROUTE_ID + ".process");
         });
         LOGGER.debug("{} route weaved", methodName);
         // start the main route
-        ctx.getRouteController().startRoute(JmsOk.ROUTE_ID);
+        ctx.getRouteController().startRoute(JmsToDb.ROUTE_ID);
         // send message
         JmsTemplate template = new JmsTemplate(cf);
         template.setReceiveTimeout(1000L);
@@ -96,18 +105,18 @@ class JmsOkTest {
     @AfterEach
     void tearDown() throws Exception {
         // remove process endpoint from main route if configured
-        List<Processor> l = ctx.getRoute(JmsOk.ROUTE_ID).filter(JmsOk.ROUTE_ID + ".process");
+        List<Processor> l = ctx.getRoute(JmsToDb.ROUTE_ID).filter(JmsToDb.ROUTE_ID + ".process");
         if (l.isEmpty()) {
             // do nothing
         } else {
             // stop the main route
             Assertions.assertNotNull(ctx);
             // remove error producing processor
-            AdviceWith.adviceWith(ctx, JmsOk.ROUTE_ID, a -> {
-                a.weaveById(JmsOk.ROUTE_ID + ".process").remove();
+            AdviceWith.adviceWith(ctx, JmsToDb.ROUTE_ID, a -> {
+                a.weaveById(JmsToDb.ROUTE_ID + ".process").remove();
             });
             // start the main route
-            ctx.getRouteController().startRoute(JmsOk.ROUTE_ID);
+            ctx.getRouteController().startRoute(JmsToDb.ROUTE_ID);
         }
     }
 
