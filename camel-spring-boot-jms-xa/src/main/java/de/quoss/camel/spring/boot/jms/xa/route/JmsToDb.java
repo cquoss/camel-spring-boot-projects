@@ -4,9 +4,11 @@ import de.quoss.camel.spring.boot.jms.xa.exception.JmsXaException;
 import de.quoss.narayana.helper.ConnectionFactoryProxy;
 import de.quoss.narayana.helper.NarayanaTransactionHelper;
 import org.apache.activemq.artemis.jms.client.ActiveMQXAConnectionFactory;
+import org.apache.camel.Route;
 import org.apache.camel.builder.endpoint.EndpointRouteBuilder;
 import org.apache.camel.component.jms.JmsComponent;
 import org.apache.camel.component.sql.SqlComponent;
+import org.apache.camel.spi.RouteController;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -51,6 +53,16 @@ public class JmsToDb extends EndpointRouteBuilder {
     public void configure() {
 
         final String methodName = "configure()";
+
+        // stop all routes on any error
+        // TODO check if stopping all routes can be achieved with less boilerplate code
+        onException(Throwable.class)
+                .process(e -> {
+                    RouteController c = getContext().getRouteController();
+                    for (Route r : getContext().getRoutes()) {
+                        c.stopRoute(r.getRouteId());
+                    }
+                });
 
         final JmsComponent jmsComponent = ((JmsComponent) getContext().getComponent("jms"));
         jmsComponent.setTransactionManager(ptm);
