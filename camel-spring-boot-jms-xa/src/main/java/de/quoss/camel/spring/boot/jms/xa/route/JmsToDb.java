@@ -1,5 +1,6 @@
 package de.quoss.camel.spring.boot.jms.xa.route;
 
+import de.quoss.camel.spring.boot.jms.xa.exception.JmsXaException;
 import de.quoss.narayana.helper.ConnectionFactoryProxy;
 import de.quoss.narayana.helper.NarayanaTransactionHelper;
 import org.apache.activemq.artemis.jms.client.ActiveMQXAConnectionFactory;
@@ -15,6 +16,8 @@ import org.springframework.util.Assert;
 
 import javax.transaction.TransactionManager;
 import javax.transaction.UserTransaction;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @Component
 public class JmsToDb extends EndpointRouteBuilder {
@@ -62,8 +65,19 @@ public class JmsToDb extends EndpointRouteBuilder {
                 .process(e -> {
                     Object body = e.getMessage().getBody();
                     LOGGER.info("{} [body.class.name={},body={}]", methodName, body.getClass().getName(), body);
+                    String[] bodyParts = {};
+                    if (body instanceof String) {
+                        bodyParts = ((String) body).split(",");
+                        if (bodyParts.length != 2) {
+                            throw new JmsXaException("Message body invalid.");
+                        }
+                    }
+                    final Map<String, String> dbColumn = new LinkedHashMap<>();
+                    dbColumn.put("id", bodyParts[0]);
+                    dbColumn.put("name", bodyParts[1]);
+                    e.getMessage().setBody(dbColumn);
                 })
-                .to(sql(SQL_INSERT_VALUE));
+                .to(sql(SQL_INSERT_VALUE)).id(JmsToDb.ROUTE_ID + ".sql-insert");
 
     }
 
