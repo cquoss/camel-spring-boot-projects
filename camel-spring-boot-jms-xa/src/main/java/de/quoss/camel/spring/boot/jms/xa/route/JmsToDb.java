@@ -21,7 +21,7 @@ public class JmsToDb extends EndpointRouteBuilder {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(JmsToDb.class);
 
-    private static final String SQL_INSERT_VALUE = "insert into account (#id, #name)";
+    private static final String SQL_INSERT_VALUE = "insert into account (id, name) values (:#id, :#name)";
 
     static final String ROUTE_ID = "jms-to-db";
 
@@ -29,7 +29,9 @@ public class JmsToDb extends EndpointRouteBuilder {
 
     private final PlatformTransactionManager ptm;
 
-    public JmsToDb(final PlatformTransactionManager ptm, final TransactionManager tm) {
+    private final ActiveMQXAConnectionFactory cf;
+
+    public JmsToDb(final PlatformTransactionManager ptm, final TransactionManager tm, final ActiveMQXAConnectionFactory cf) {
         final String methodName = "JmsToDb(PlatformTransactionManager, TransactionManager)";
         LOGGER.trace("{} start [tm={}]", methodName, tm);
         Assert.notNull(ptm, "Platform transaction manager must not be null.");
@@ -37,6 +39,8 @@ public class JmsToDb extends EndpointRouteBuilder {
         Assert.notNull(tm, "Transaction manager must not be null.");
         this.tm = tm;
         LOGGER.debug("{} [tm.type={}]", methodName, tm.getClass().getCanonicalName());
+        Assert.notNull(cf, "Connection factory must not be null.");
+        this.cf = cf;
         LOGGER.trace("{} end]", methodName);
     }
 
@@ -44,8 +48,6 @@ public class JmsToDb extends EndpointRouteBuilder {
     public void configure() {
 
         final String methodName = "configure()";
-
-        ActiveMQXAConnectionFactory cf = new ActiveMQXAConnectionFactory();
 
         final JmsComponent jmsComponent = ((JmsComponent) getContext().getComponent("jms"));
         jmsComponent.setTransactionManager(ptm);

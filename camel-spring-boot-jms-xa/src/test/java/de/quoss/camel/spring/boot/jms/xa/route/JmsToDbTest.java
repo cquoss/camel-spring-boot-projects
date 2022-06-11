@@ -27,7 +27,7 @@ class JmsToDbTest {
     private static final Logger LOGGER = LoggerFactory.getLogger(JmsToDbTest.class);
 
     // acquire connection factory (but not the auto-wired one from main route (duplicate client-id issue / xa issue)
-    private static final ActiveMQConnectionFactory CF = new ActiveMQConnectionFactory();
+    private static final ActiveMQConnectionFactory CF = new ActiveMQConnectionFactory("vm://localhost");
 
     @Autowired
     CamelContext ctx;
