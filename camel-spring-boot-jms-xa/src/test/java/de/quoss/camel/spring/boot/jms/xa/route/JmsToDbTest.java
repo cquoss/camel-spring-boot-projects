@@ -142,6 +142,8 @@ class JmsToDbTest {
             // start the main route
             ctx.getRouteController().startRoute(JmsToDb.ROUTE_ID);
         }
+        // truncate account table
+        executeSql("delete from account");
     }
 
     private Object executeSql(final String sql) throws SQLException  {
