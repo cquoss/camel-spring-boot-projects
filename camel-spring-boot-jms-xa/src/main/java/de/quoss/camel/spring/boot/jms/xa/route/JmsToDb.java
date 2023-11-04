@@ -1,5 +1,6 @@
 package de.quoss.camel.spring.boot.jms.xa.route;
 
+import de.quoss.camel.spring.boot.jms.xa.StopRoutes;
 import de.quoss.camel.spring.boot.jms.xa.exception.JmsXaException;
 import de.quoss.narayana.helper.ConnectionFactoryProxy;
 import de.quoss.narayana.helper.NarayanaTransactionHelper;
@@ -30,13 +31,19 @@ public class JmsToDb extends EndpointRouteBuilder {
 
     static final String ROUTE_ID = "jms-to-db";
 
+    static final String JMS_TOPIC = ROUTE_ID;
+    static final String JMS_SUBSCRIPTION = ROUTE_ID + "-shared-durable-subscription";
+
     private final TransactionManager tm;
 
     private final PlatformTransactionManager ptm;
 
     private final ActiveMQXAConnectionFactory cf;
 
-    public JmsToDb(final PlatformTransactionManager ptm, final TransactionManager tm, final ActiveMQXAConnectionFactory cf) {
+    private final StopRoutes stopRoutes;
+
+    public JmsToDb(final PlatformTransactionManager ptm, final TransactionManager tm, final ActiveMQXAConnectionFactory cf,
+                   final StopRoutes stopRoutes) {
         final String methodName = "JmsToDb(PlatformTransactionManager, TransactionManager)";
         LOGGER.trace("{} start [tm={}]", methodName, tm);
         Assert.notNull(ptm, "Platform transaction manager must not be null.");
@@ -46,6 +53,8 @@ public class JmsToDb extends EndpointRouteBuilder {
         LOGGER.debug("{} [tm.type={}]", methodName, tm.getClass().getCanonicalName());
         Assert.notNull(cf, "Connection factory must not be null.");
         this.cf = cf;
+        Assert.notNull(stopRoutes, "Stop routes bean must not be null.");
+        this.stopRoutes = stopRoutes;
         LOGGER.trace("{} end]", methodName);
     }
 
@@ -54,15 +63,11 @@ public class JmsToDb extends EndpointRouteBuilder {
 
         final String methodName = "configure()";
 
-        // stop all routes on any error
-        // TODO check if stopping all routes can be achieved with less boilerplate code
+        // stop all routes on any error using scheduled stop helper bean
         onException(Throwable.class)
-                .process(e -> {
-                    RouteController c = getContext().getRouteController();
-                    for (Route r : getContext().getRoutes()) {
-                        c.stopRoute(r.getRouteId());
-                    }
-                });
+                .process(e -> stopRoutes.setDoStop(true))
+                .id(JmsToDb.ROUTE_ID + ".process-on-exception")
+                .handled(false);
 
         final JmsComponent jmsComponent = ((JmsComponent) getContext().getComponent("jms"));
         jmsComponent.setTransactionManager(ptm);
@@ -70,9 +75,8 @@ public class JmsToDb extends EndpointRouteBuilder {
         jmsComponent.getConfiguration().setSynchronous(true);
 
         from(jms("topic:" + JmsToDb.ROUTE_ID)
-                .durableSubscriptionName(JmsToDb.ROUTE_ID + "-shared-durable-subscription")
-                .subscriptionShared(true)
-                .advanced().receiveTimeout(1000L))
+                .durableSubscriptionName(JMS_SUBSCRIPTION)
+                .subscriptionShared(true))
                 .routeId(ROUTE_ID)
                 .process(e -> {
                     Object body = e.getMessage().getBody();

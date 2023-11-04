@@ -12,7 +12,11 @@
 
     <logger name="de.unioninvestment.md.dp.basis.narayana" level="all"/>
     <logger name="de.quoss.camel.spring.boot.jms.xa.route" level="info"/>
+    <logger name="de.quoss.camel.spring.boot.jms.xa.route.JmsToDbTest" level="trace"/>
     <logger name="org.apache.activemq" level="info"/>
+    <logger name="de.quoss.camel.spring.boot.jms.xa.CustomTracer" level="trace"/>
+    <logger name="org.apache.camel.impl.engine.DefaultTracer" level="trace"/>
+    <logger name="de.quoss.camel.spring.boot.jms.xa.StopRoutes" level="trace"/>
 
     <root level="info">
         <appender-ref ref="fileAppender" />

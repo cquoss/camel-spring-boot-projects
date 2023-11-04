@@ -1,6 +1,5 @@
 package de.quoss.camel.spring.boot.jms.xa;
 
-import de.quoss.camel.spring.boot.jms.xa.route.JmsToDb;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
